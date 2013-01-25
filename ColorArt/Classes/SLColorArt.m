@@ -50,21 +50,49 @@
 @property(nonatomic,readwrite,strong) UIColor *primaryColor;
 @property(nonatomic,readwrite,strong) UIColor *secondaryColor;
 @property(nonatomic,readwrite,strong) UIColor *detailColor;
+@property(nonatomic,readwrite) NSInteger randomColorThreshold;
 @end
 
 @implementation SLColorArt
 
 - (id)initWithImage:(UIImage*)image
 {
+    self = [self initWithImage:image threshold:2];
+    if (self) {
+
+    }
+    return self;
+}
+
+- (id)initWithImage:(UIImage*)image threshold:(NSInteger)threshold;
+{
     self = [super init];
 
     if (self)
     {
+        self.randomColorThreshold = threshold;
         self.image = image;
         [self _processImage];
     }
 
     return self;
+}
+
+
++ (void)processImage:(UIImage *)image
+        scaledToSize:(CGSize)scaleSize
+           threshold:(NSInteger)threshold
+          onComplete:(void (^)(SLColorArt *colorArt))completeBlock;
+{
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        UIImage *scaledImage = [image scaledToSize:scaleSize];
+        SLColorArt *colorArt = [[SLColorArt alloc] initWithImage:scaledImage
+                                                       threshold:threshold];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            completeBlock(colorArt);
+        });
+    });
+    
 }
 
 - (void)_processImage
@@ -123,6 +151,14 @@
 	UIColor *primaryColor = nil;
 	UIColor *secondaryColor = nil;
 	UIColor *detailColor = nil;
+    
+    // If the random color threshold is too high and the image size too small,
+    // we could miss detecting the background color and crash.
+    if ( backgroundColor == nil )
+    {
+        backgroundColor = [UIColor whiteColor];
+    }
+    
 	BOOL darkBackground = [backgroundColor pc_isDarkColor];
 
 	[self _findTextColors:imageColors primaryColor:&primaryColor secondaryColor:&secondaryColor detailColor:&detailColor backgroundColor:backgroundColor];
@@ -215,7 +251,7 @@ typedef struct RGBAPixel
 	{
 		NSUInteger colorCount = [edgeColors countForObject:curColor];
 
-		if ( colorCount <= 2 ) // prevent using random colors, threshold should be based on input image size
+		if ( colorCount <= self.randomColorThreshold ) // prevent using random colors, threshold should be based on input image size
 			continue;
 
 		PCCountedColor *container = [[PCCountedColor alloc] initWithColor:curColor count:colorCount];
