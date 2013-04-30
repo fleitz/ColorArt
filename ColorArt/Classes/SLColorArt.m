@@ -146,7 +146,7 @@
 
 - (NSDictionary*)_analyzeImage:(UIImage*)anImage
 {
-    NSCountedSet *imageColors = nil;
+    NSMutableDictionary *imageColors = nil;
 	UIColor *backgroundColor = [self _findEdgeColor:anImage imageColors:&imageColors];
 	UIColor *primaryColor = nil;
 	UIColor *secondaryColor = nil;
@@ -209,12 +209,27 @@ typedef struct RGBAPixel
     
 } RGBAPixel;
 
-- (UIColor*)_findEdgeColor:(UIImage*)image imageColors:(NSCountedSet**)colors
+- (UIColor*)_findEdgeColor:(UIImage*)image imageColors:(NSDictionary**)colors
 {
 	CGImageRef imageRep = image.CGImage;
+    
+    NSUInteger pixelRange = 8;
+    NSUInteger scale = 256 / pixelRange;
+    NSUInteger rawImageColors[pixelRange][pixelRange][pixelRange];
+    NSUInteger rawEdgeColors[pixelRange][pixelRange][pixelRange];
+    
+    // Should probably just switch to calloc, but this doesn't show up in instruments
+    // So I guess it's fine
+    for(NSUInteger b = 0; b < pixelRange; b++) {
+        for(NSUInteger g = 0; g < pixelRange; g++) {
+            for(NSUInteger r = 0; r < pixelRange; r++) {
+                rawImageColors[r][g][b] = 0;
+                rawEdgeColors[r][g][b] = 0;
+            }
+        }
+    }
+    
 
-//	if ( ![imageRep isKindOfClass:[NSBitmapImageRep class]] ) // sanity check
-//		return nil;
     NSInteger width = CGImageGetWidth(imageRep);// [imageRep pixelsWide];
 	NSInteger height = CGImageGetHeight(imageRep); //[imageRep pixelsHigh];
 
@@ -222,8 +237,6 @@ typedef struct RGBAPixel
     CGContextRef bmContext = CGBitmapContextCreate(NULL, width, height, 8, 4 * width, cs, kCGImageAlphaNoneSkipLast);
     CGContextDrawImage(bmContext, (CGRect){.origin.x = 0.0f, .origin.y = 0.0f, .size.width = width, .size.height = height}, image.CGImage);
     CGColorSpaceRelease(cs);
-    NSCountedSet* imageColors = [[NSCountedSet alloc] initWithCapacity:width * height];
-    NSCountedSet* edgeColors = [[NSCountedSet alloc] initWithCapacity:height];
     const RGBAPixel* pixels = (const RGBAPixel*)CGBitmapContextGetData(bmContext);
     for (NSUInteger y = 0; y < height; y++)
     {
@@ -231,25 +244,48 @@ typedef struct RGBAPixel
         {
             const NSUInteger index = x + y * width;
             RGBAPixel pixel = pixels[index];
-            UIColor* color = [[UIColor alloc] initWithRed:((CGFloat)pixel.red / 255.0f) green:((CGFloat)pixel.green / 255.0f) blue:((CGFloat)pixel.blue / 255.0f) alpha:1.0f];
-            if (0 == x)
-                [edgeColors addObject:color];
-            [imageColors addObject:color];
+            Byte r = pixel.red / scale;
+            Byte g = pixel.green / scale;
+            Byte b = pixel.blue / scale;
+            rawImageColors[r][g][b] = rawImageColors[r][g][b] + 1;
+            if(0 == x) {
+                rawEdgeColors[r][g][b] = rawEdgeColors[r][g][b] + 1;
+            }
         }
     }
     CGContextRelease(bmContext);
 
+    NSMutableDictionary* imageColors = [NSMutableDictionary dictionary];
+    NSMutableDictionary* edgeColors = [NSMutableDictionary dictionary];
+    
+    for(NSUInteger b = 0; b < pixelRange; b++) {
+        for(NSUInteger g = 0; g < pixelRange; g++) {
+            for(NSUInteger r = 0; r < pixelRange; r++) {
+                NSUInteger count = rawImageColors[r][g][b];
+                if(count > 3) {
+                    UIColor* color = [UIColor colorWithRed:r / (CGFloat)pixelRange green:g / (CGFloat)pixelRange blue:b / (CGFloat)pixelRange alpha:1];
+                    [imageColors setObject:@(count) forKey:color];
+                }
+                
+                count = rawEdgeColors[r][g][b];
+                if(count > 3) {
+                    UIColor* color = [UIColor colorWithRed:r / (CGFloat)pixelRange green:g / (CGFloat)pixelRange blue:b / (CGFloat)pixelRange alpha:1];
+                    [edgeColors setObject:@(count) forKey:color];
+                }
+            }
+        }
+    }
 
 	*colors = imageColors;
 
 
-	NSEnumerator *enumerator = [edgeColors objectEnumerator];
+	NSEnumerator *enumerator = [edgeColors.allKeys objectEnumerator];
 	UIColor *curColor = nil;
 	NSMutableArray *sortedColors = [NSMutableArray arrayWithCapacity:[edgeColors count]];
 
 	while ( (curColor = [enumerator nextObject]) != nil )
 	{
-		NSUInteger colorCount = [edgeColors countForObject:curColor];
+		NSUInteger colorCount = [[edgeColors objectForKey:curColor] unsignedIntegerValue];
 
 		if ( colorCount <= self.randomColorThreshold ) // prevent using random colors, threshold should be based on input image size
 			continue;
@@ -295,9 +331,9 @@ typedef struct RGBAPixel
 }
 
 
-- (void)_findTextColors:(NSCountedSet*)colors primaryColor:(UIColor**)primaryColor secondaryColor:(UIColor**)secondaryColor detailColor:(UIColor**)detailColor backgroundColor:(UIColor*)backgroundColor
+- (void)_findTextColors:(NSMutableDictionary*)colors primaryColor:(UIColor**)primaryColor secondaryColor:(UIColor**)secondaryColor detailColor:(UIColor**)detailColor backgroundColor:(UIColor*)backgroundColor
 {
-	NSEnumerator *enumerator = [colors objectEnumerator];
+	NSEnumerator *enumerator = [colors.allKeys objectEnumerator];
 	UIColor *curColor = nil;
 	NSMutableArray *sortedColors = [NSMutableArray arrayWithCapacity:[colors count]];
 	BOOL findDarkTextColor = ![backgroundColor pc_isDarkColor];
@@ -308,7 +344,7 @@ typedef struct RGBAPixel
 
 		if ( [curColor pc_isDarkColor] == findDarkTextColor )
 		{
-			NSUInteger colorCount = [colors countForObject:curColor];
+			NSUInteger colorCount = [[colors objectForKey:curColor] unsignedIntegerValue];
 
 			//if ( colorCount <= 2 ) // prevent using random colors, threshold should be based on input image size
 			//	continue;
