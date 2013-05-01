@@ -149,7 +149,7 @@
 
 - (NSDictionary*)_analyzeImage:(UIImage*)anImage
 {
-    NSMutableDictionary *imageColors = nil;
+    NSArray *imageColors = nil;
 	UIColor *backgroundColor = [self _findEdgeColor:anImage imageColors:&imageColors];
 	UIColor *primaryColor = nil;
 	UIColor *secondaryColor = nil;
@@ -212,7 +212,7 @@ typedef struct RGBAPixel
     
 } RGBAPixel;
 
-- (UIColor*)_findEdgeColor:(UIImage*)image imageColors:(NSDictionary**)colors
+- (UIColor*)_findEdgeColor:(UIImage*)image imageColors:(NSArray**)colors
 {
 	CGImageRef imageRep = image.CGImage;
     
@@ -258,48 +258,33 @@ typedef struct RGBAPixel
     }
     CGContextRelease(bmContext);
 
-    NSMutableDictionary* imageColors = [NSMutableDictionary dictionary];
-    NSMutableDictionary* edgeColors = [NSMutableDictionary dictionary];
+    NSMutableArray* imageColors = [NSMutableArray array];
+    NSMutableArray* edgeColors = [NSMutableArray array];
     
     for(NSUInteger b = 0; b < pixelRange; b++) {
         for(NSUInteger g = 0; g < pixelRange; g++) {
             for(NSUInteger r = 0; r < pixelRange; r++) {
                 NSUInteger count = rawImageColors[r][g][b];
-                if(count > 3) {
+                if(count > self.randomColorThreshold) {
                     UIColor* color = [UIColor colorWithRed:r / (CGFloat)pixelRange green:g / (CGFloat)pixelRange blue:b / (CGFloat)pixelRange alpha:1];
-                    [imageColors setObject:@(count) forKey:color];
+                    PCCountedColor* countedColor = [[PCCountedColor alloc] initWithColor:color count:count];
+                    [imageColors addObject:countedColor];
                 }
                 
                 count = rawEdgeColors[r][g][b];
-                if(count > 3) {
+                if(count > self.randomColorThreshold) {
                     UIColor* color = [UIColor colorWithRed:r / (CGFloat)pixelRange green:g / (CGFloat)pixelRange blue:b / (CGFloat)pixelRange alpha:1];
-                    [edgeColors setObject:@(count) forKey:color];
+                    PCCountedColor* countedColor = [[PCCountedColor alloc] initWithColor:color count:count];
+                    [edgeColors addObject:countedColor];
                 }
             }
         }
     }
 
 	*colors = imageColors;
-
-
-	NSEnumerator *enumerator = [edgeColors.allKeys objectEnumerator];
-	UIColor *curColor = nil;
-	NSMutableArray *sortedColors = [NSMutableArray arrayWithCapacity:[edgeColors count]];
-
-	while ( (curColor = [enumerator nextObject]) != nil )
-	{
-		NSUInteger colorCount = [[edgeColors objectForKey:curColor] unsignedIntegerValue];
-
-		if ( colorCount <= self.randomColorThreshold ) // prevent using random colors, threshold should be based on input image size
-			continue;
-
-		PCCountedColor *container = [[PCCountedColor alloc] initWithColor:curColor count:colorCount];
-
-		[sortedColors addObject:container];
-	}
-
+    
+    NSMutableArray* sortedColors = edgeColors;
 	[sortedColors sortUsingSelector:@selector(compare:)];
-
 
 	PCCountedColor *proposedEdgeColor = nil;
 
@@ -334,20 +319,18 @@ typedef struct RGBAPixel
 }
 
 
-- (void)_findTextColors:(NSMutableDictionary*)colors primaryColor:(UIColor**)primaryColor secondaryColor:(UIColor**)secondaryColor detailColor:(UIColor**)detailColor backgroundColor:(UIColor*)backgroundColor
+- (void)_findTextColors:(NSArray*)colors primaryColor:(UIColor**)primaryColor secondaryColor:(UIColor**)secondaryColor detailColor:(UIColor**)detailColor backgroundColor:(UIColor*)backgroundColor
 {
-	NSEnumerator *enumerator = [colors.allKeys objectEnumerator];
 	UIColor *curColor = nil;
 	NSMutableArray *sortedColors = [NSMutableArray arrayWithCapacity:[colors count]];
 	BOOL findDarkTextColor = ![backgroundColor pc_isDarkColor];
 
-	while ( (curColor = [enumerator nextObject]) != nil )
-	{
-		curColor = [curColor pc_colorWithMinimumSaturation:.15];
+    for(PCCountedColor* countedColor in colors) {
+        UIColor* curColor = [countedColor.color pc_colorWithMinimumSaturation:.15];
 
 		if ( [curColor pc_isDarkColor] == findDarkTextColor )
 		{
-			NSUInteger colorCount = [[colors objectForKey:curColor] unsignedIntegerValue];
+			NSUInteger colorCount = countedColor.count;
 
 			//if ( colorCount <= 2 ) // prevent using random colors, threshold should be based on input image size
 			//	continue;
@@ -388,16 +371,7 @@ typedef struct RGBAPixel
 }
 
 @end
-@implementation UIColor (Copying)
 
-- (id)copyWithZone:(NSZone *)zone{
-    CGColorRef cgcopy = CGColorCreateCopy([self CGColor]);
-    UIColor *copy = [[[self class] allocWithZone:zone] initWithCGColor:cgcopy];
-    CGColorRelease(cgcopy);
-    return copy;
-}
-
-@end
 @implementation UIColor (DarkAddition)
 
 - (BOOL)pc_isDarkColor
