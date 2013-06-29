@@ -212,7 +212,7 @@ typedef struct RGBAPixel
 {
 	CGImageRef imageRep = image.CGImage;
     
-    NSUInteger pixelRange = 8;
+    NSUInteger pixelRange = 32;
     NSUInteger scale = 256 / pixelRange;
     NSUInteger rawImageColors[pixelRange][pixelRange][pixelRange];
     NSUInteger rawEdgeColors[pixelRange][pixelRange][pixelRange];
