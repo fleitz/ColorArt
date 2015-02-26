@@ -233,8 +233,7 @@ typedef struct RGBAPixel
 	NSInteger height = CGImageGetHeight(imageRep); //[imageRep pixelsHigh];
 
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
-    CGContextRef bmContext = CGBitmapContextCreate(NULL, width, height, 8, 4 * width, cs, kCGImageAlphaNoneSkipLast);
-    CGContextDrawImage(bmContext, (CGRect){.origin.x = 0.0f, .origin.y = 0.0f, .size.width = width, .size.height = height}, image.CGImage);
+    CGContextRef bmContext = CGBitmapContextCreate(NULL, width, height, 8, 4 * width, cs, (CGBitmapInfo)kCGImageAlphaNoneSkipLast);    CGContextDrawImage(bmContext, (CGRect){.origin.x = 0.0f, .origin.y = 0.0f, .size.width = width, .size.height = height}, image.CGImage);
     CGColorSpaceRelease(cs);
     const RGBAPixel* pixels = (const RGBAPixel*)CGBitmapContextGetData(bmContext);
     for (NSUInteger y = 0; y < height; y++)
