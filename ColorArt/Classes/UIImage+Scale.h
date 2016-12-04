@@ -10,4 +10,5 @@
 
 @interface UIImage (Scale)
 - (UIImage*) scaledToSize:(CGSize)newSize;
+- (UIImage*) scaledToSize:(CGSize)newSize overColor:(UIColor *)overColor;
 @end

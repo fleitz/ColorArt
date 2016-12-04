@@ -32,4 +32,10 @@
            threshold:(NSInteger)threshold
           onComplete:(void (^)(SLColorArt *colorArt))completeBlock;
 
++ (void)processImage:(UIImage *)image
+        scaledToSize:(CGSize)scaleSize
+     scaledOverColor:(UIColor *)scaledOverColor
+           threshold:(NSInteger)threshold
+          onComplete:(void (^)(SLColorArt *colorArt))completeBlock;
+
 @end
