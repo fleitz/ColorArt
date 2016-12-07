@@ -77,14 +77,25 @@
     return self;
 }
 
++ (void)processImage:(UIImage *)image
+        scaledToSize:(CGSize)scaleSize
+           threshold:(NSInteger)threshold
+          onComplete:(void (^)(SLColorArt *colorArt))completeBlock {
+    [self processImage:image
+          scaledToSize:scaleSize
+       scaledOverColor:nil
+             threshold:threshold
+            onComplete:completeBlock];
+}
 
 + (void)processImage:(UIImage *)image
         scaledToSize:(CGSize)scaleSize
+     scaledOverColor:(UIColor *)scaledOverColor
            threshold:(NSInteger)threshold
           onComplete:(void (^)(SLColorArt *colorArt))completeBlock;
 {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        UIImage *scaledImage = [image scaledToSize:scaleSize];
+        UIImage *scaledImage = [image scaledToSize:scaleSize overColor:scaledOverColor];
         SLColorArt *colorArt = [[SLColorArt alloc] initWithImage:scaledImage
                                                        threshold:threshold];
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -164,7 +175,6 @@
 
 	if ( primaryColor == nil )
 	{
-		NSLog(@"missed primary");
 		if ( darkBackground )
 			primaryColor = [UIColor whiteColor];
 		else
@@ -173,7 +183,6 @@
 
 	if ( secondaryColor == nil )
 	{
-		NSLog(@"missed secondary");
 		if ( darkBackground )
 			secondaryColor = [UIColor whiteColor];
 		else
@@ -182,7 +191,6 @@
 
 	if ( detailColor == nil )
 	{
-		NSLog(@"missed detail");
 		if ( darkBackground )
 			detailColor = [UIColor whiteColor];
 		else
